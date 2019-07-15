@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Lib (
     CoinNote
@@ -15,7 +16,13 @@ module Lib (
   , putPriceCoin
   ) where
 
-import Data.List (intercalate)
+import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
+
+type Txt = T.Text
+
+tshow :: Show a => a -> Txt
+tshow = T.pack . show
 
 type Pounds = Int
 type Shillings = Int
@@ -72,44 +79,45 @@ toCoins i
   | i >= value Halfpenny   = Halfpenny   : toCoins (i - value Halfpenny)
   | i >= value Farthing    = Farthing    : toCoins (i - value Farthing)
   | i == 0                 = []
-  | otherwise = error "This shouldn't happen..."
 
 data LSD = LSD Pounds Shillings Pence Farthings
   deriving (Show, Eq)
 
-class Txt a where
-  txt :: a -> String
+class ToTxt a where
+  txt :: a -> Txt
 
-instance Txt LSD where
+instance ToTxt LSD where
   txt lsd = case lsd of
     (LSD 0 0 0 0) -> "0"
     (LSD 0 0 0 f) -> fraction f <> "d."
-    (LSD 0 0 d 0) -> show d <> "d."
-    (LSD 0 0 d f) -> show d <> fraction f <> "d."
-    (LSD 0 s 0 0) -> show s <> "/-"
-    (LSD 0 s 0 f) -> show s <> "/" <> fraction f
-    (LSD 0 s d 0) -> show s <> "/" <> show d
-    (LSD 0 s d f) -> show s <> "/" <> show d <> fraction f
-    (LSD l 0 0 0) -> "£" <> show l
-    (LSD l 0 0 f) -> "£" <> show l <> fraction f <> "d."
-    (LSD l s 0 0) -> "£" <> show l <> " " <> show s <> "/-"
-    (LSD l s 0 f) -> "£" <> show l <> " " <> show s <> "/" <> fraction f
-    (LSD l 0 d 0) -> "£" <> show l <> " " <> show d <> "d."
-    (LSD l 0 d f) -> "£" <> show l <> " " <> show d <> fraction f <> "d."
-    (LSD l s d 0) -> "£" <> show l <> " " <> show s <> "/" <> show d
-    (LSD l s d f) -> "£" <> show l <> " " <> show s <> "/" <> show d <> fraction f
+    (LSD 0 0 d 0) -> txt d <> "d."
+    (LSD 0 0 d f) -> txt d <> fraction f <> "d."
+    (LSD 0 s 0 0) -> txt s <> "/-"
+    (LSD 0 s 0 f) -> txt s <> "/" <> fraction f
+    (LSD 0 s d 0) -> txt s <> "/" <> tshow d
+    (LSD 0 s d f) -> txt s <> "/" <> tshow d <> fraction f
+    (LSD l 0 0 0) -> "£" <> txt l
+    (LSD l 0 0 f) -> "£" <> txt l <> fraction f <> "d."
+    (LSD l 0 d 0) -> "£" <> txt l <> " " <> txt d <> "d."
+    (LSD l 0 d f) -> "£" <> txt l <> " " <> txt d <> fraction f <> "d."
+    (LSD l s 0 0) -> "£" <> txt l <> " " <> txt s <> "/-"
+    (LSD l s 0 f) -> "£" <> txt l <> " " <> txt s <> "/" <> fraction f
+    (LSD l s d 0) -> "£" <> txt l <> " " <> txt s <> "/" <> txt d
+    (LSD l s d f) -> "£" <> txt l <> " " <> txt s <> "/" <> txt d <> fraction f
 
-fraction :: Farthings -> String
+fraction :: Farthings -> Txt
 fraction 1 = "¼"
 fraction 2 = "½"
 fraction 3 = "¾"
-fraction _ =  error "Larger than 3"
 
-instance Txt [CoinNote] where
-  txt coins = intercalate ", " (txt <$> coins)
+instance ToTxt [CoinNote] where
+  txt coins = T.intercalate ", " (txt <$> coins)
 
-instance Txt CoinNote where
-  txt = show
+instance ToTxt CoinNote where
+  txt = tshow
+
+instance ToTxt Int where
+  txt = tshow
 
 change :: CoinNote -> [CoinNote]
 change coin = case coin of
@@ -151,8 +159,8 @@ toFarthings :: LSD -> Farthings
 toFarthings (LSD l s d f) = (l * 4 * 240) + (s * 4 * 12) + (4 * d) + f
 
 putPriceCoin :: Pounds -> Shillings -> Pence -> Farthings -> IO ()
-putPriceCoin l s d f = putStrLn $ "Price: " <> (txt $ mkLSD l s d f) <>
-                                "\nCoins: " <> (txt (toCoins $ toFarthings $ mkLSD l s d f))
+putPriceCoin l s d f = TIO.putStrLn $ "Price: " <> (txt $ mkLSD l s d f) <>
+                                    "\nCoins: " <> (txt (toCoins $ toFarthings $ mkLSD l s d f))
 
 coinsLSD :: [CoinNote] -> LSD
 coinsLSD =  mkLSD 0 0 0 . sum . fmap value
