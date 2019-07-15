@@ -1,6 +1,6 @@
 module Main where
 
-import Lib
+import LSD
 
 main :: IO ()
 main = do

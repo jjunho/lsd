@@ -1,7 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Lib (
+module LSD (
     CoinNote
   , Pounds
   , Shillings
