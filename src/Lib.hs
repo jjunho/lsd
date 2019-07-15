@@ -1,6 +1,19 @@
 {-# LANGUAGE FlexibleInstances #-}
 
-module LSD where
+module Lib (
+    CoinNote
+  , Pounds
+  , Shillings
+  , Pence
+  , Farthings
+  , value
+  , toCoins
+  , mkLSD
+  , txt
+  , toFarthings
+  , coinsLSD
+  , putPriceCoin
+  ) where
 
 import Data.List (intercalate)
 
@@ -90,7 +103,7 @@ fraction :: Farthings -> String
 fraction 1 = "¼"
 fraction 2 = "½"
 fraction 3 = "¾"
-fraction _ = error "Larger than 3"
+fraction _ =  error "Larger than 3"
 
 instance Txt [CoinNote] where
   txt coins = intercalate ", " (txt <$> coins)
