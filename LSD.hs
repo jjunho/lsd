@@ -4,6 +4,11 @@ module LSD where
 
 import Data.List (intercalate)
 
+type Pounds = Int
+type Shillings = Int
+type Pence = Int
+type Farthings = Int
+
 data CoinNote
   = Farthing
   | Halfpenny
@@ -21,7 +26,7 @@ data CoinNote
   | TenPound
   deriving (Show, Eq, Enum, Bounded)
 
-value :: Num a => CoinNote -> a
+value :: CoinNote -> Farthings
 value c = case c of
   Farthing    ->  1
   Halfpenny   ->  2
@@ -38,13 +43,12 @@ value c = case c of
   FivePound   ->  5 * value OnePound
   TenPound    -> 10 * value OnePound
 
-toCoins :: (Ord a, Num a) => a -> [CoinNote]
+toCoins :: Farthings -> [CoinNote]
 toCoins i
   | i >= value TenPound    = TenPound    : toCoins (i - value TenPound)
   | i >= value FivePound   = FivePound   : toCoins (i - value FivePound)
   | i >= value OnePound    = OnePound    : toCoins (i - value OnePound)
   | i >= value TenShilling = TenShilling : toCoins (i - value TenShilling)
-  | i >= value Guinea      = Guinea      : toCoins (i - value Guinea)
   | i >= value Crown       = Crown       : toCoins (i - value Crown)
   | i >= value HalfCrown   = HalfCrown   : toCoins (i - value HalfCrown)
   | i >= value Florin      = Florin      : toCoins (i - value Florin)
@@ -55,9 +59,9 @@ toCoins i
   | i >= value Halfpenny   = Halfpenny   : toCoins (i - value Halfpenny)
   | i >= value Farthing    = Farthing    : toCoins (i - value Farthing)
   | i == 0                 = []
-  | otherwise = error "Error"
+  | otherwise = error "This shouldn't happen..."
 
-data LSD = LSD Int Int Int Int
+data LSD = LSD Pounds Shillings Pence Farthings
   deriving (Show, Eq)
 
 class Txt a where
@@ -70,7 +74,7 @@ instance Txt LSD where
     (LSD 0 0 d 0) -> show d <> "d."
     (LSD 0 0 d f) -> show d <> fraction f <> "d."
     (LSD 0 s 0 0) -> show s <> "/-"
-    (LSD 0 s 0 f) -> show s <> "/" <> fraction f <> "d."
+    (LSD 0 s 0 f) -> show s <> "/" <> fraction f
     (LSD 0 s d 0) -> show s <> "/" <> show d
     (LSD 0 s d f) -> show s <> "/" <> show d <> fraction f
     (LSD l 0 0 0) -> "£" <> show l
@@ -82,11 +86,11 @@ instance Txt LSD where
     (LSD l s d 0) -> "£" <> show l <> " " <> show s <> "/" <> show d
     (LSD l s d f) -> "£" <> show l <> " " <> show s <> "/" <> show d <> fraction f
 
-fraction :: Int -> String
+fraction :: Farthings -> String
 fraction 1 = "¼"
 fraction 2 = "½"
 fraction 3 = "¾"
-fraction _ = error "Impossible"
+fraction _ = error "Larger than 3"
 
 instance Txt [CoinNote] where
   txt coins = intercalate ", " (txt <$> coins)
@@ -105,25 +109,37 @@ change coin = case coin of
   Florin      -> [Shilling,Shilling]
   HalfCrown   -> [Florin,Sixpence]
   Crown       -> [HalfCrown,Florin]
-  Guinea      -> [OnePound,Shilling]
   TenShilling -> [Crown,Crown]
   OnePound    -> [TenShilling,TenShilling]
+  Guinea      -> [OnePound,Shilling]
   FivePound   -> [OnePound,OnePound,OnePound,OnePound,OnePound]
   TenPound    -> [FivePound,FivePound]
 
 instance Semigroup LSD where
   LSD l1 s1 d1 f1 <> LSD l2 s2 d2 f2 = mkLSD (l1 + l2) (s1 + s2) (d1 + d2) (f1 + f2)
 
-mkLSD :: Int -> Int -> Int -> Int -> LSD
-mkLSD l s d f
-  | s >= 20 = mkLSD (l + s `div` 20) (s `rem` 20) d f
-  | d >= 12 = mkLSD l (s + d `div` 12) (d `rem` 12) f
-  | f >= 4  = mkLSD l s (d + f `div` 4) (f `rem` 4)
-  | otherwise = LSD l s d f
+sInL :: Shillings
+sInL = 20
 
-toFarthings :: LSD -> Int
+dInS :: Pence
+dInS = 12
+
+fInD :: Farthings
+fInD = 4
+
+mkLSD :: Pounds -> Shillings -> Pence -> Farthings -> LSD
+mkLSD l s d f
+  | s >= sInL = mkLSD (l + s `div` sInL) (s `rem` sInL)      d f
+  | d >= dInS = mkLSD  l                 (s + d `div` dInS) (d `rem` dInS)      f
+  | f >= fInD = mkLSD  l                  s                 (d + f `div` fInD) (f `rem` fInD)
+  | otherwise = LSD    l                  s                  d                  f
+
+toFarthings :: LSD -> Farthings
 toFarthings (LSD l s d f) = (l * 4 * 240) + (s * 4 * 12) + (4 * d) + f
 
-putPriceCoin :: Int -> Int -> Int -> Int -> IO ()
+putPriceCoin :: Pounds -> Shillings -> Pence -> Farthings -> IO ()
 putPriceCoin l s d f = putStrLn $ "Price: " <> (txt $ mkLSD l s d f) <>
-                                  "\nCoins: " <> (txt (toCoins $ toFarthings $ mkLSD l s d f))
+                                "\nCoins: " <> (txt (toCoins $ toFarthings $ mkLSD l s d f))
+
+coinsLSD :: [CoinNote] -> LSD
+coinsLSD =  mkLSD 0 0 0 . sum . fmap value
